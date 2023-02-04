@@ -174,3 +174,78 @@ def draw_cohorts_aov(april_aov):
     april_aov = april_aov.replace('nan', '',regex=True)
     return april_aov
 
+st.markdown("""
+This webapp performs cohort analysis of my_company data!
+* **Python libraries:** base64, pandas, streamlit, numpy, matplotlib, seaborn
+* **Data source:** [Shopify](https://company_name.myshopify.com/admin).
+""")
+
+# dashboard title
+st.title(f"Live {cohorts.index[0]} to {cohorts.index[-1]} Cohort Dashboard")
+
+# top-level filters
+cohort_tabletype_filter = st.selectbox('Select type of cohort',['By unique customers', 'By percentage', 'By AOV'])
+
+cohort_filter = st.multiselect('Select cohort', list(cohorts.index))
+# dataframe filter
+@st.experimental_memo
+def select_which_table_to_draw(cohort_tabletype_filter,cohort_filter):
+    if cohort_tabletype_filter=='By unique customers':
+        result = draw_cohorts_table_exact_num(april_cohorts)
+        if cohort_filter != []:
+            return result.loc[cohort_filter,:]
+        else: return result
+    elif cohort_tabletype_filter=='By percentage':
+        result = draw_cohorts_table_percentage(cohorts)
+        if cohort_filter != []:
+            return result.loc[cohort_filter,:]
+        else: return result
+    elif cohort_tabletype_filter=='By AOV':
+        result = draw_cohorts_aov(april_aov)
+        if cohort_filter != []:
+            return result.loc[cohort_filter,:]
+        else: 
+            return result
+
+draw_cohorts = lambda x,y: select_which_table_to_draw(x,y)
+#st.dataframe(draw_cohorts.loc[cohort_filter,:] if cohort_filter !=[] else draw_cohorts)
+output = draw_cohorts(cohort_tabletype_filter,cohort_filter)
+st.dataframe(output)
+    
+st.download_button(label='Download csv', data=output.to_csv(), mime='text/csv')
+    
+# create three columns
+kpi1, kpi2, kpi3 = st.columns(3)
+
+# fill in those three columns with respective metrics or KPIs
+
+aov = np.mean(df['total_sales'])
+aov_goal = 95.00
+nc = np.mean(df.loc[df['customer_type']=='First-time'].groupby(['day']).count()['customer_id'])
+nc_goal = 30
+rc = np.mean(df.loc[df['customer_type']=='Returning'].groupby(['day']).count()['customer_id'])
+rc_goal = 250
+
+
+kpi1.metric(
+    label="AOV",
+    value=f"$ {round(aov,2)}",
+    delta=f"-${round(aov_goal-aov,2)}" if aov_goal>aov else f"${round(aov-aov_goal,2)}",
+)
+
+kpi2.metric(
+    label="New customers/day",
+    value=int(nc),
+    delta=f"-{round((nc_goal-nc)/nc_goal*100,2)}%" if nc_goal>nc else f"{round((nc - nc_goal)/nc_goal*100,0)}%",
+)
+
+kpi3.metric(
+    label="Returning customers/day",
+    value= int(rc),
+    delta=f"-{round((rc_goal - rc)/rc_goal*100,2)}%" if rc_goal>rc else f"{round((rc-rc_goal)/rc_goal*100,2)}%"
+)
+
+# Interactive charts
+# fig_col1, fig_col2 = st.columns(2)
+
+cohorts_t = cohorts.transpose()
